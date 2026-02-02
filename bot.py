@@ -4,7 +4,8 @@ from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes, CommandHandler
 from generate import generate_blog_post, generate_short_form
-from transcribe import transcribe
+# from transcribe import transcribe
+from transcribe_v2 import transcribe
 import tempfile
 
 load_dotenv()
@@ -145,7 +146,6 @@ def main():
             handle_video
         )
     )
-
 
         print("🤖 Bot is running... (Press Ctrl+C to stop)")
         app.run_polling()
