@@ -3,7 +3,7 @@ import logging
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes, CommandHandler
-from generate import generate_blog_post, generate_short_form
+from generate import generate_blog_post, generate_short_form, generate_x_posts, generate_linkedin_posts, parse_blog_content, save_blog_to_docx
 # from transcribe import transcribe
 from transcribe_v2 import transcribe
 import tempfile
@@ -77,6 +77,8 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✅ Transcription complete!\n\n"
         "Now choose what you want:\n"
         "📱 /short — 3 short-form social media posts\n"
+        "🐤 /X_Post — 3 structured X posts\n"
+        "💼 /Linkedin_Post — 2 linkedin-form social media posts\n"
         "📝 /blog  — A long-form blog post"
     )
 
@@ -101,6 +103,47 @@ async def create_short(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📱 Here are your 3 short-form posts:\n\n{short_content}"
     )
 
+
+async def create_x_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    transcript = context.user_data.get("transcript")
+
+    if not transcript:
+        await update.message.reply_text("❌ No transcript found. Please send a video first!")
+        return
+
+    await update.message.reply_text("✨ Generating x-post content...")
+
+    try:
+        short_content = generate_x_posts(transcript)
+    except Exception as e:
+        logger.error(f"Content generation failed: {e}")
+        await update.message.reply_text("❌ Something went wrong. Please try again.")
+        return
+
+    await update.message.reply_text(
+        f"📱 Here are your 3 x-content posts:\n\n{short_content}"
+    )
+
+async def create_linkedin_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    transcript = context.user_data.get("transcript")
+
+    if not transcript:
+        await update.message.reply_text("❌ No transcript found. Please send a video first!")
+        return
+
+    await update.message.reply_text("✨ Generating linkedin-form content...")
+
+    try:
+        short_content = generate_linkedin_posts(transcript)
+    except Exception as e:
+        logger.error(f"Content generation failed: {e}")
+        await update.message.reply_text("❌ Something went wrong. Please try again.")
+        return
+
+    await update.message.reply_text(
+        f"📱 Here are your 2 linkedin-form posts:\n\n{short_content}"
+    )
+
 async def create_blog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     transcript = context.user_data.get("transcript")
 
@@ -112,22 +155,22 @@ async def create_blog(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         blog_post = generate_blog_post(transcript)
+        file_path = save_blog_to_docx(blog_post)
     except Exception as e:
         logger.error(f"Blog generation failed: {e}")
         await update.message.reply_text("❌ Something went wrong. Please try again.")
         return
 
-    # Telegram has a 4096 character limit per message.
-    # If the blog post is longer, we split it into chunks.
-    MAX_LENGTH = 4000
-    if len(blog_post) <= MAX_LENGTH:
-        await update.message.reply_text(f"📝 Here is your blog post:\n\n{blog_post}")
-    else:
-        # Split into chunks
-        chunks = [blog_post[i:i + MAX_LENGTH] for i in range(0, len(blog_post), MAX_LENGTH)]
-        await update.message.reply_text(f"📝 Here is your blog post (sending in {len(chunks)} parts):\n")
-        for i, chunk in enumerate(chunks, 1):
-            await update.message.reply_text(f"— Part {i} —\n\n{chunk}")
+    # Send document instead of long text
+    with open(file_path, "rb") as doc_file:
+        await update.message.reply_document(
+            document=doc_file,
+            filename="Your_Blog_Post.docx",
+            caption="📝 Here is your generated blog post!"
+        )
+
+    # Optional: clean up temp file
+    os.remove(file_path)
 
 def main():
         token = os.getenv('BOT_TOKEN')
@@ -138,6 +181,8 @@ def main():
         app.add_handler(CommandHandler('start', start))
         app.add_handler(CommandHandler('short', create_short))
         app.add_handler(CommandHandler('blog', create_blog))
+        app.add_handler(CommandHandler('X_Post', create_x_post))
+        app.add_handler(CommandHandler('Linkedin_Post', create_linkedin_post))
 
         # Handle Video Message
         app.add_handler(
@@ -146,7 +191,6 @@ def main():
             handle_video
         )
     )
-
         print("🤖 Bot is running... (Press Ctrl+C to stop)")
         app.run_polling()
 
