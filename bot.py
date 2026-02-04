@@ -7,7 +7,8 @@ from generate import generate_blog_post, generate_short_form, generate_x_posts, 
 # from transcribe import transcribe
 from transcribe_v2 import transcribe
 import tempfile
-
+from vid_links import download_video_from_url, contains_url
+import re
 load_dotenv()
 
 # LOGGING SYSTEM
@@ -31,7 +32,7 @@ async def start(update:Update, context:ContextTypes.DEFAULT_TYPE):
                     "Go ahead and send a video!"
             )
 
-
+# HANDLE VIDEOS
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📥 Received your video! Downloading...")
 
@@ -82,7 +83,47 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📝 /blog  — A long-form blog post"
     )
 
+# HANDLE LINKS
 
+async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message_text = update.message.text
+
+    if not contains_url(message_text):
+        return  # Ignore if no link
+
+    await update.message.reply_text("🔗 Video link detected! Downloading...")
+
+    video_url = re.search(r"(https?://\S+)", message_text).group(1)
+
+    try:
+        video_path = download_video_from_url(video_url) 
+    except Exception as e:
+        logger.error(f"Video download failed: {e}")
+        await update.message.reply_text("❌ Failed to download video from the link.")
+        return
+
+    await update.message.reply_text("🎙️ Transcribing the video...")
+
+    try:
+        transcript = transcribe(video_path)
+    except Exception as e:
+        logger.error(f"Transcription failed: {e}")
+        await update.message.reply_text("❌ Transcription failed.")
+        return
+
+    os.remove(video_path)
+    context.user_data["transcript"] = transcript
+
+    await update.message.reply_text(
+        "✅ Transcription complete from link!\n\n"
+        "Now choose what you want:\n"
+        "📱 /short — 3 short-form posts\n"
+        "🐤 /X_Post — 3 X posts\n"
+        "💼 /Linkedin_Post — 2 LinkedIn posts\n"
+        "📝 /blog — A long-form blog post"
+    )
+
+# SHORT POSTS
 async def create_short(update: Update, context: ContextTypes.DEFAULT_TYPE):
     transcript = context.user_data.get("transcript")
 
@@ -103,7 +144,7 @@ async def create_short(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📱 Here are your 3 short-form posts:\n\n{short_content}"
     )
 
-
+# X_POSTS
 async def create_x_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     transcript = context.user_data.get("transcript")
 
@@ -172,6 +213,7 @@ async def create_blog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Optional: clean up temp file
     os.remove(file_path)
 
+# MAIN FUNCTION
 def main():
         token = os.getenv('BOT_TOKEN')
         if not token:
@@ -189,8 +231,14 @@ def main():
         MessageHandler(
             filters.VIDEO or filters.Document() ,
             handle_video
-        )
-    )
+        ) )
+
+        app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            handle_link
+        ))
+        
         print("🤖 Bot is running... (Press Ctrl+C to stop)")
         app.run_polling()
 
