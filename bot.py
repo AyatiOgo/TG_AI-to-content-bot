@@ -7,7 +7,7 @@ from generate import generate_blog_post, generate_short_form, generate_x_posts, 
 # from transcribe import transcribe
 from transcribe_v2 import transcribe
 import tempfile
-from vid_links import download_video_from_url, contains_url
+from vid_links import download_video_from_url, contains_url, download_audio_from_url
 import re
 load_dotenv()
 
@@ -17,8 +17,6 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
-
-
 
 async def start(update:Update, context:ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
@@ -43,6 +41,17 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ I only accept video files. Please send a video!")
         return
+
+    file_size_mb = video_file.file_size / (1024 * 1024)
+
+    if file_size_mb > 20:
+        await update.message.reply_text(
+            f"💫 Your video is {file_size_mb:.1f}MB, which is too large for direct upload.\n\n"
+            "🔗 Please upload the video to a platform like YouTube, Google Drive, Dropbox, etc.\n"
+            "Then send me the video link instead."
+        )
+        return
+
 
     # Download the video to a temporary location
     file = await context.bot.get_file(video_file.file_id)
@@ -84,39 +93,41 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # HANDLE LINKS
-
 async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_text = update.message.text
+    user_id = update.effective_user.id
 
     if not contains_url(message_text):
-        return  # Ignore if no link
+        return
 
-    await update.message.reply_text("🔗 Video link detected! Downloading...")
+    await update.message.reply_text("🔗 Video link detected! Extracting audio...")
 
     video_url = re.search(r"(https?://\S+)", message_text).group(1)
 
     try:
-        video_path = download_video_from_url(video_url) 
+        audio_path = download_audio_from_url(video_url, user_id)  # 🎵 AUDIO ONLY
     except Exception as e:
-        logger.error(f"Video download failed: {e}")
-        await update.message.reply_text("❌ Failed to download video from the link.")
+        logger.error(f"Audio download failed: {e}")
+        await update.message.reply_text("❌ Failed to download audio from the link.")
         return
 
-    await update.message.reply_text("🎙️ Transcribing the video...")
+    await update.message.reply_text("🎙️ Transcribing audio...")
 
     try:
-        transcript = transcribe(video_path)
+        transcript = transcribe(audio_path)
     except Exception as e:
         logger.error(f"Transcription failed: {e}")
         await update.message.reply_text("❌ Transcription failed.")
         return
 
-    os.remove(video_path)
+    if os.path.exists(audio_path):
+        os.remove(audio_path)
+
     context.user_data["transcript"] = transcript
 
     await update.message.reply_text(
         "✅ Transcription complete from link!\n\n"
-        "Now choose what you want:\n"
+        "Choose what you want next:\n"
         "📱 /short — 3 short-form posts\n"
         "🐤 /X_Post — 3 X posts\n"
         "💼 /Linkedin_Post — 2 LinkedIn posts\n"
