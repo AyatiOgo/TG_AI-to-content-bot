@@ -5,7 +5,7 @@ from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes, CommandHandler
 from generate import generate_blog_post, generate_short_form, generate_x_posts, generate_linkedin_posts, parse_blog_content, save_blog_to_docx
 # from transcribe import transcribe
-from transcribe_v2 import transcribe
+from transcribe_v2 import transcribe, transcribe_url
 import tempfile
 from vid_links import download_video_from_url, contains_url, download_audio_from_url
 import re
@@ -114,7 +114,7 @@ async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🎙️ Transcribing audio...")
 
     try:
-        transcript = transcribe(audio_path)
+        transcript = transcribe_url(audio_path)
     except Exception as e:
         logger.error(f"Transcription failed: {e}")
         await update.message.reply_text("❌ Transcription failed.")

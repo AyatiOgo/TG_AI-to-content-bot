@@ -4,10 +4,9 @@ import cloudconvert
 import requests
 from faster_whisper import WhisperModel
 load_dotenv()
-
 ffmpeg_path = r"C:\Program Files\ffmpeg\bin"
 os.environ["PATH"] = ffmpeg_path + os.pathsep + os.environ["PATH"]
-
+from vid_links import download_audio_from_url
 
 print("Loading Faster Whisper model... (this may take a moment)")
 MODEL = WhisperModel(
@@ -99,6 +98,26 @@ def extract_audio(video_path: str):
 
 def transcribe(video_path: str) -> str:
     audio_path = extract_audio(video_path)
+
+    print("Audio path:", audio_path)
+
+    segments, info = MODEL.transcribe(
+        audio_path,
+        beam_size=5  
+    )
+
+    transcript = ""
+    for segment in segments:
+        transcript += segment.text
+
+    transcript = transcript.strip()
+
+    if os.path.exists(audio_path):
+        os.remove(audio_path)
+
+    return transcript
+
+def transcribe_url(audio_path):
 
     print("Audio path:", audio_path)
 
