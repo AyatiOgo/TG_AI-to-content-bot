@@ -1,18 +1,21 @@
 import os
-import subprocess
-import whisper
 from dotenv import load_dotenv
 import cloudconvert
 import requests
-
+from faster_whisper import WhisperModel
 load_dotenv()
 
 ffmpeg_path = r"C:\Program Files\ffmpeg\bin"
 os.environ["PATH"] = ffmpeg_path + os.pathsep + os.environ["PATH"]
 
 
-print("Loading Whisper model... (this may take a moment)")
-MODEL = whisper.load_model("base")
+print("Loading Faster Whisper model... (this may take a moment)")
+MODEL = WhisperModel(
+    "base",
+    device="cpu",         
+    compute_type="int8"   
+)
+
 
 CLOUDCONVETER_API=os.getenv('CLOUD_CONVERT_KEY')
 
@@ -98,11 +101,18 @@ def transcribe(video_path: str) -> str:
     audio_path = extract_audio(video_path)
 
     print("Audio path:", audio_path)
-    print("File exists before Whisper:", os.path.exists(audio_path))
-    print("File size:", os.path.getsize(audio_path) if os.path.exists(audio_path) else "MISSING")
 
-    result = MODEL.transcribe(audio_path)
-    transcript = result["text"].strip()
+    segments, info = MODEL.transcribe(
+        audio_path,
+        beam_size=5  
+    )
+
+    transcript = ""
+    for segment in segments:
+        transcript += segment.text
+
+    transcript = transcript.strip()
+
     if os.path.exists(audio_path):
         os.remove(audio_path)
 
