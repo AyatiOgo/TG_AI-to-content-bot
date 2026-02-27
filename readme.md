@@ -343,43 +343,47 @@ jobs:
 ```yaml
 ---
 version: "2.0"
-
 services:
-  telegram-bot:
-    image: yourusername/telegram-video-bot:latest
+  bot:
+    image: YOUT_DOCKER_IMAGE
     env:
-      - "TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN"
-      - "AKASH_API_KEY=YOUR_AKASH_API_KEY"
-      - "CLOUDCONVERT_API_KEY=YOUR_CLOUDCONVERT_KEY"
+      - BOT_TOKEN=YOUR_BOT_TOKEN
+      - AKASH_API_KEY=YOUR_AKASH_API_KEY
+      - >-
+        CLOUD_CONVERT_KEY=YOUR_CLOUD_COVERT_KEY
     expose:
-      - port: 8080
+      - port: 80
         as: 80
         to:
-          - global: false
-
+          - global: true
 profiles:
   compute:
-    telegram-bot:
+    bot:
       resources:
         cpu:
-          units: 1.0
+          units: 4
         memory:
-          size: 2Gi
+          size: 8Gi
         storage:
-          size: 5Gi
-
+          - size: 10Gi
   placement:
-    akash:
+    dcloud:
+      attributes:
+        host: akash
       pricing:
-        telegram-bot:
-          denom: uakt
-          amount: 10000
-
+        bot:
+          denom: ibc/170C677610AC31DF0904FFE09CD3B5C657492170E7E52372E48756B71E56F2F1
+          amount: 80000
+      signedBy:
+        anyOf:
+          - akash1365yvmc4s7awdyj3n2sav7xfx76adc6dnmlx63
+        allOf: []
 deployment:
-  telegram-bot:
-    akash:
-      profile: telegram-bot
+  bot:
+    dcloud:
+      profile: bot
       count: 1
+
 ```
 
 4. **Replace the placeholders:**
